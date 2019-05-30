@@ -61,8 +61,8 @@
  */
 namespace PAGI\CDR\Impl;
 
-use PAGI\Client\IClient;
 use PAGI\CDR\ICDR;
+use PAGI\Client\IClient;
 
 /**
  * CDR Facade.
@@ -197,7 +197,6 @@ class CDRFacade implements ICDR
         return $this->getCustom('duration');
     }
 
-
     /**
      * (non-PHPdoc)
      * @see PAGI\CDR.ICDR::getEndTime()
@@ -260,7 +259,6 @@ class CDRFacade implements ICDR
     {
         return $this->getCustom('dstchannel');
     }
-
 
     /**
      * (non-PHPdoc)
@@ -325,7 +323,7 @@ class CDRFacade implements ICDR
      */
     protected function getCDRVariable($name)
     {
-        return $this->client->getFullVariable('CDR(' . $name . ')');
+        return $this->client->getFullVariable('CHANNEL(' . $name . ')');
     }
 
     /**
@@ -338,7 +336,7 @@ class CDRFacade implements ICDR
      */
     protected function setCDRVariable($name, $value)
     {
-        $this->client->setVariable('CDR(' . $name . ')', $value);
+        $this->client->setVariable('CHANNEL(' . $name . ')', $value);
     }
 
     /**

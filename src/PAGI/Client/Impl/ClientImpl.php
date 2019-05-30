@@ -31,7 +31,6 @@ namespace PAGI\Client\Impl;
 
 use PAGI\Client\AbstractClient;
 use PAGI\Exception\PAGIException;
-use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 
 /**
@@ -81,6 +80,8 @@ class ClientImpl extends AbstractClient
      */
     protected function send($text)
     {
+        $text = rtrim($text);
+
         $this->logger->debug('Sending: ' . $text);
         $text .= "\n";
         $len = strlen($text);
@@ -165,7 +166,7 @@ class ClientImpl extends AbstractClient
     public static function getInstance(array $options = array())
     {
         if (self::$instance === false) {
-            $ret = new ClientImpl($options);
+            $ret            = new ClientImpl($options);
             self::$instance = $ret;
         } else {
             $ret = self::$instance;
@@ -192,7 +193,7 @@ class ClientImpl extends AbstractClient
     protected function __construct(array $options = array())
     {
         $this->options = $options;
-        $this->logger = new NullLogger;
+        $this->logger  = new NullLogger;
         $this->open();
     }
 }

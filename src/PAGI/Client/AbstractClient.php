@@ -27,29 +27,26 @@
  */
 namespace PAGI\Client;
 
-use Psr\Log\LoggerInterface;
-use Psr\Log\NullLogger;
-use PAGI\Logger\Asterisk\Impl\AsteriskLoggerImpl;
-use PAGI\Client\Result\Result;
-use PAGI\Client\Result\FaxResult;
-use PAGI\Client\Result\ExecResult;
+use PAGI\CallerId\Impl\CallerIdFacade;
+use PAGI\CDR\Impl\CDRFacade;
+use PAGI\ChannelVariables\Impl\ChannelVariablesFacade;
+use PAGI\Client\ChannelStatus;
+use PAGI\Client\IClient;
+use PAGI\Client\Result\AmdResult;
+use PAGI\Client\Result\DataReadResult;
 use PAGI\Client\Result\DialResult;
 use PAGI\Client\Result\DigitReadResult;
-use PAGI\Client\Result\DataReadResult;
+use PAGI\Client\Result\ExecResult;
+use PAGI\Client\Result\FaxResult;
 use PAGI\Client\Result\PlayResult;
 use PAGI\Client\Result\RecordResult;
-use PAGI\Client\Result\AmdResult;
-use PAGI\Client\ChannelStatus;
-use PAGI\Exception\ExecuteCommandException;
-use PAGI\Exception\DatabaseInvalidEntryException;
-use PAGI\Exception\PAGIException;
+use PAGI\Client\Result\Result;
 use PAGI\Exception\ChannelDownException;
-use PAGI\Exception\SoundFileException;
+use PAGI\Exception\DatabaseInvalidEntryException;
 use PAGI\Exception\InvalidCommandException;
-use PAGI\Client\IClient;
-use PAGI\ChannelVariables\Impl\ChannelVariablesFacade;
-use PAGI\CDR\Impl\CDRFacade;
-use PAGI\CallerId\Impl\CallerIdFacade;
+use PAGI\Exception\PAGIException;
+use PAGI\Logger\Asterisk\Impl\AsteriskLoggerImpl;
+use Psr\Log\LoggerInterface;
 
 /**
  * An abstract AGI client.
@@ -82,9 +79,9 @@ abstract class AbstractClient implements IClient
      */
     protected $arguments = array();
 
-    protected $cdrInstance = false;
+    protected $cdrInstance              = false;
     protected $channelVariablesInstance = false;
-    protected $clidInstance = false;
+    protected $clidInstance             = false;
 
     /**
      * Sends a command to asterisk. Returns an array with:
@@ -154,9 +151,9 @@ abstract class AbstractClient implements IClient
         $knownOptions = array(
             'initialSilence', 'greeting', 'afterGreetingSilence', 'totalAnalysisTime',
             'miniumWordLength', 'betweenWordSilence', 'maximumNumberOfWords',
-            'silenceThreshold', 'maximumWordLength'
+            'silenceThreshold', 'maximumWordLength',
         );
-        $args = array();
+        $args  = array();
         $total = count($knownOptions);
         for ($i = 0; $i < $total; $i++) {
             $key = $knownOptions[$i];
@@ -217,7 +214,7 @@ abstract class AbstractClient implements IClient
         $start = time();
         array_unshift($options, $channel);
         $result = new DialResult($this->exec('Dial', $options));
-        $end = time();
+        $end    = time();
         $result->setPeerName($this->getFullVariable('DIALEDPEERNAME'));
         $result->setPeerNumber($this->getFullVariable('DIALEDPEERNUMBER'));
         $result->setDialedTime($end - $start);
@@ -237,7 +234,7 @@ abstract class AbstractClient implements IClient
             ' ',
             array(
                 'EXEC', '"' . $application . '"',
-                '"' . implode(',', $options) . '"'
+                '"' . implode(',', $options) . '"',
             )
         );
         return new ExecResult($this->send($cmd));
@@ -275,7 +272,7 @@ abstract class AbstractClient implements IClient
         $cmd = implode(
             ' ',
             array(
-                'STREAM', 'FILE', '"' . $file . '"', '"' . $escapeDigits . '"'
+                'STREAM', 'FILE', '"' . $file . '"', '"' . $escapeDigits . '"',
             )
         );
         return new PlayResult(new DigitReadResult($this->send($cmd)));
@@ -285,19 +282,23 @@ abstract class AbstractClient implements IClient
      * (non-PHPdoc)
      * @see PAGI\Client.IClient::record()
      */
-    public function record($file, $format, $escapeDigits, $maxRecordTime = -1, $silence = false)
+    public function record($file, $format, $escapeDigits, $maxRecordTime = -1, $options = [])
     {
         $cmd = implode(
             ' ',
             array(
                 'RECORD', 'FILE',
-                '"' . $file . '"', '"' . $format . '"',
-                '"' . $escapeDigits . '"', '"' . $maxRecordTime . '"'
+                '"' . $file . '"',
+                '"' . $format . '"',
+                '"' . $escapeDigits . '"',
+                '"' . $maxRecordTime . '"',
             )
         );
-        if ($silence !== false) {
-            $cmd .= ' "s=' . $silence . '"';
+
+        if (!empty($options)) {
+            $cmd .= ' "' . implode('', $options) . '"';
         }
+
         return new RecordResult($this->send($cmd));
     }
 
@@ -338,7 +339,7 @@ abstract class AbstractClient implements IClient
     public function setCallerId($name, $number)
     {
         $clid = '\\"' . $name . '\\"<' . $number . '>';
-        $cmd = implode(' ', array('SET', 'CALLERID', '"' . $clid . '"'));
+        $cmd  = implode(' ', array('SET', 'CALLERID', '"' . $clid . '"'));
         $this->send($cmd);
     }
 
@@ -361,13 +362,13 @@ abstract class AbstractClient implements IClient
     public function getData($file, $maxTime, $maxDigits)
     {
         $timeout = false;
-        $cmd = implode(
+        $cmd     = implode(
             ' ',
             array(
                 'GET', 'DATA',
                 '"' . $file . '"',
-                '"' . $maxTime . '"',
-                '"' . $maxDigits . '"'
+                $maxTime,
+                $maxDigits,
             )
         );
         return new PlayResult(new DataReadResult($this->send($cmd)));
@@ -381,8 +382,9 @@ abstract class AbstractClient implements IClient
     {
         return $this->playAndRead(implode(' ', array(
             'GET', 'OPTION',
-            '"' . $file . '"', '"' . $escapeDigits . '"',
-            '"' . $maxTime . '"'
+            '"' . $file . '"',
+            $escapeDigits,
+            $maxTime,
         )));
     }
 
@@ -393,7 +395,7 @@ abstract class AbstractClient implements IClient
     public function sayTime($time, $escapeDigits = '')
     {
         return $this->playAndRead(implode(' ', array(
-            'SAY', 'TIME', '"' . $time . '"','"' . $escapeDigits . '"'
+            'SAY', 'TIME', '"' . $time . '"', '"' . $escapeDigits . '"',
         )));
     }
 
@@ -404,7 +406,7 @@ abstract class AbstractClient implements IClient
     public function sayDate($time, $escapeDigits = '')
     {
         return $this->playAndRead(implode(' ', array(
-            'SAY', 'DATE', '"' . $time . '"', '"' . $escapeDigits . '"'
+            'SAY', 'DATE', '"' . $time . '"', '"' . $escapeDigits . '"',
         )));
     }
 
@@ -415,7 +417,7 @@ abstract class AbstractClient implements IClient
     public function sayDateTime($time, $format, $escapeDigits = '')
     {
         return $this->playAndRead(implode(' ', array(
-            'SAY', 'DATETIME', '"' . $time . '"', '"' . $escapeDigits . '"', '"' . $format . '"'
+            'SAY', 'DATETIME', '"' . $time . '"', '"' . $escapeDigits . '"', '"' . $format . '"',
         )));
     }
 
@@ -426,7 +428,7 @@ abstract class AbstractClient implements IClient
     public function sayDigits($digits, $escapeDigits = '')
     {
         return $this->playAndRead(implode(' ', array(
-            'SAY', 'DIGITS', '"' . $digits . '"', '"' . $escapeDigits . '"'
+            'SAY', 'DIGITS', '"' . $digits . '"', '"' . $escapeDigits . '"',
         )));
     }
 
@@ -437,7 +439,7 @@ abstract class AbstractClient implements IClient
     public function sayNumber($digits, $escapeDigits = '')
     {
         return $this->playAndRead(implode(' ', array(
-            'SAY', 'NUMBER', '"' . $digits . '"', '"' . $escapeDigits . '"'
+            'SAY', 'NUMBER', '"' . $digits . '"', '"' . $escapeDigits . '"',
         )));
     }
 
@@ -448,7 +450,7 @@ abstract class AbstractClient implements IClient
     public function sayAlpha($what, $escapeDigits = '')
     {
         return $this->playAndRead(implode(' ', array(
-            'SAY', 'ALPHA', '"' . $what . '"', '"' . $escapeDigits . '"'
+            'SAY', 'ALPHA', '"' . $what . '"', '"' . $escapeDigits . '"',
         )));
     }
 
@@ -459,7 +461,7 @@ abstract class AbstractClient implements IClient
     public function sayPhonetic($what, $escapeDigits = '')
     {
         return $this->playAndRead(implode(' ', array(
-            'SAY', 'PHONETIC', '"' . $what . '"', '"' . $escapeDigits . '"'
+            'SAY', 'PHONETIC', '"' . $what . '"', '"' . $escapeDigits . '"',
         )));
     }
 
@@ -512,7 +514,7 @@ abstract class AbstractClient implements IClient
      */
     public function getVariable($name)
     {
-        $cmd = implode(' ', array('GET', 'VARIABLE', '"' . $name . '"'));
+        $cmd    = implode(' ', array('GET', 'VARIABLE', '"' . $name . '"'));
         $result = $this->send($cmd);
         if ($result->isResult(0)) {
             return false;
@@ -540,7 +542,6 @@ abstract class AbstractClient implements IClient
         return substr($result->getData(), 1, -1);
     }
 
-
     /**
      * (non-PHPdoc)
      * @see PAGI\Client.IClient::setVariable()
@@ -553,7 +554,7 @@ abstract class AbstractClient implements IClient
                 array(
                     'SET', 'VARIABLE',
                     '"' . $name . '"',
-                    '"' . str_replace('"', '\\"', $value) . '"'
+                    '"' . str_replace('"', '\\"', $value) . '"',
                 )
             )
         );
@@ -611,7 +612,7 @@ abstract class AbstractClient implements IClient
         $cmd = implode(
             ' ',
             array(
-                'DATABASE', 'DELTREE', '"' . $family. '"', '"' . $key . '"'
+                'DATABASE', 'DELTREE', '"' . $family . '"', '"' . $key . '"',
             )
         );
         $result = $this->send($cmd);
@@ -644,7 +645,7 @@ abstract class AbstractClient implements IClient
     {
         $cmd = implode(
             ' ',
-            array('DATABASE', 'GET', '"' . $family. '"', '"' . $key . '"')
+            array('DATABASE', 'GET', '"' . $family . '"', '"' . $key . '"')
         );
         $result = $this->send($cmd);
         if ($result->isResult(0)) {
@@ -680,7 +681,7 @@ abstract class AbstractClient implements IClient
      */
     public function sendText($text)
     {
-        $cmd = implode(' ', array('SEND', 'TEXT', '"' . $text . '"'));
+        $cmd    = implode(' ', array('SEND', 'TEXT', '"' . $text . '"'));
         $result = $this->send($cmd);
         if ($result->isResult(-1)) {
             throw new PAGIException('Command failed');
@@ -693,7 +694,7 @@ abstract class AbstractClient implements IClient
      */
     public function sendImage($filename)
     {
-        $cmd = implode(' ', array('SEND', 'IMAGE', '"' . $filename . '"'));
+        $cmd    = implode(' ', array('SEND', 'IMAGE', '"' . $filename . '"'));
         $result = $this->send($cmd);
         if ($result->isResult(-1)) {
             throw new PAGIException('Command failed');
