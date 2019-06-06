@@ -282,7 +282,7 @@ abstract class AbstractClient implements IClient
      * (non-PHPdoc)
      * @see PAGI\Client.IClient::record()
      */
-    public function record($file, $format, $escapeDigits, $maxRecordTime = -1, $options = [])
+    public function record($file, $format, $escapeDigits, $maxRecordTime = -1, $silence = false, $options = [])
     {
         $cmd = implode(
             ' ',
@@ -295,6 +295,10 @@ abstract class AbstractClient implements IClient
             )
         );
 
+        if (false !== $silence) {
+            $cmd .= ' "s='.$silence.'"';
+        }
+        
         if (!empty($options)) {
             $cmd .= ' "' . implode('', $options) . '"';
         }
